@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
+  <title>AR A-Frame + MindAR — Практическая работа</title>
+
+  <!-- A-Frame (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.7.1/aframe.min.js"></script>
+
+  <!-- MindAR A-Frame component -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    body, html {
+      margin:0; padding:0; height:100%;
+      background:#000; color:#fff; font-family:Arial, sans-serif;
+    }
+    #overlay {
+      position: fixed; left:0; right:0; top:0; padding:10px;
+      text-align:center; z-index: 10; pointer-events:none;
+      background: linear-gradient(0deg, rgba(0,0,0,0.4), transparent);
+      font-size: 18px;
+    }
+    #ui {
+      position: fixed; left:10px; bottom:10px; z-index:11;
+      display:flex; gap:10px;
+    }
+    button {
+      pointer-events:auto;
+      padding:10px 14px;
+      background:#222; color:#fff;
+      border:1px solid #444;
+      border-radius:6px;
+      font-size:16px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Текстовая подсказка сверху -->
+  <div id="overlay">Наведите камеру на маркер. Нажмите «Запустить AR».</div>
+
+  <!-- Кнопки управления -->
+  <div id="ui">
+    <button id="btn-start">Запустить AR</button>
+    <button id="btn-reset">Сброс</button>
+  </div>
+
+  <!-- A-Frame + MindAR сцена -->
+  <a-scene
+      mindar-image="imageTargetSrc: targets/targets.mind;
+                    uiLoading: Загрузка...;
+                    uiScanning: Наведите камеру на маркер;"
+      embedded
+      color-space="sRGB"
+      renderer="antialias: true; physicallyCorrectLights: true;"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false">
+
+    <!-- Цель (маркер) -->
+    <a-entity mindar-image-target="targetIndex: 0">
+
+      <!-- Контейнер модели -->
+      <a-entity id="modelRoot"
+                position="0 0 0"
+                rotation="0 0 0"
+                scale="0.05 0.05 0.05">
+
+        <!-- Свет -->
+        <a-entity light="type: directional; intensity: 1"
+                  position="0 1 1"></a-entity>
+
+        <!-- Модель -->
+        <a-gltf-model id="theModel"
+                      src="assets/model.glb"
+                      position="0 0 0"
+                      rotation="0 0 0">
+        </a-gltf-model>
+
+      </a-entity>
+    </a-entity>
+
+    <!-- Камера -->
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <!-- Логика кнопок + жесты -->
+  <script>
+    const btnStart = document.getElementById('btn-start');
+    const btnReset = document.getElementById('btn-reset');
+    const overlay  = document.getElementById('overlay');
+
+    let mindarComponent;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const scene = document.querySelector('a-scene');
+      mindarComponent = scene.components['mindar-image'];
+
+      // Кнопка "Запустить AR"
+      btnStart.addEventListener('click', async () => {
+        try {
+          await mindarComponent.start();
+          overlay.textContent = "Наведите камеру на маркер";
+        } catch (err) {
+          alert("Разрешите доступ к камере. Для телефона нужен HTTPS или localhost.");
+        }
+      });
+
+      // Кнопка "Сброс"
+      btnReset.addEventListener('click', () => {
+        const root = document.getElementById('modelRoot');
+        root.setAttribute('position', '0 0 0');
+        root.setAttribute('rotation', '0 0 0');
+        root.setAttribute('scale', '0.05 0.05 0.05');
+      });
+    });
+
+    /* ============================
+       ЖЕСТЫ: перемещение, масштаб, вращение
+       ============================ */
+
+    (function() {
+      const root = document.getElementById('modelRoot');
+      let lastTouch = null;
+      let lastDist  = null;
+      let dragging  = false;
+
+      function dist(t1, t2) {
+        const dx = t1.clientX - t2.clientX;
+        const dy = t1.clientY - t2.clientY;
+        return Math.sqrt(dx*dx + dy*dy);
+      }
+
+      function onStart(e) {
+        if (e.touches.length === 1) {
+          dragging = true;
+          lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+        }
+        if (e.touches.length === 2) {
+          lastDist = dist(e.touches[0], e.touches[1]);
+          lastTouch = {
+            x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+            y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+          };
+        }
+      }
+
+      function onMove(e) {
+        if (!root) return;
+
+        // один палец → перемещение
+        if (e.touches.length === 1 && dragging && lastTouch) {
+          const dx = e.touches[0].clientX - lastTouch.x;
+          const dy = e.touches[0].clientY - lastTouch.y;
+
+          const pos = root.getAttribute('position');
+          const factor = 0.0008;
+
+          root.setAttribute('position', {
+            x: pos.x + dx * factor,
+            y: pos.y - dy * factor,
+            z: pos.z
+          });
+
+          lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+        }
+
+        // два пальца → масштаб + вращение
+        if (e.touches.length === 2) {
+          const newDist = dist(e.touches[0], e.touches[1]);
+
+          if (lastDist) {
+            // масштаб
+            const scaleFactor = newDist / lastDist;
+            const s = root.getAttribute('scale').x * scaleFactor;
+
+            root.setAttribute('scale', {
+              x: s, y: s, z: s
+            });
+          }
+
+          // вращение по оси Y
+          const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const rot  = root.getAttribute('rotation');
+          const dx   = midX - lastTouch.x;
+
+          root.setAttribute('rotation', {
+            x: rot.x,
+            y: rot.y + dx * 0.3,
+            z: rot.z
+          });
+
+          lastDist = newDist;
+          lastTouch = {x: midX, y: lastTouch.y};
+        }
+
+        e.preventDefault();
+      }
+
+      function onEnd(e) {
+        if (e.touches.length === 0) {
+          dragging = false;
+          lastTouch = null;
+          lastDist = null;
+        }
+      }
+
+      const sceneEl = document.querySelector('a-scene');
+      sceneEl.addEventListener('touchstart', onStart, {passive:false});
+      sceneEl.addEventListener('touchmove',  onMove,  {passive:false});
+      sceneEl.addEventListener('touchend',   onEnd,   {passive:false});
+    })();
+  </script>
+</body>
+</html>
