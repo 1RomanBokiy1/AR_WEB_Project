@@ -2,8 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>MindAR + A-Frame с кнопками вращения</title>
-  <!-- Заблокировать масштабирование -->
+  <title>MindAR + A-Frame с кнопками управления</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <!-- A-Frame -->
@@ -19,14 +18,17 @@
       overflow: hidden; 
       width: 100%; 
       height: 100%; 
+      background: #000;
+      color: white;
+      font-family: Arial, sans-serif;
     }
     #ui { 
       position: fixed; 
       top: 10px; 
-      left: 10px; 
+      left: 50%; 
+      transform: translateX(-50%);
       z-index: 10; 
-      color: white; 
-      font-family: Arial; 
+      font-size: 16px;
       background: rgba(0,0,0,0.3); 
       padding: 5px 10px; 
       border-radius: 5px;
@@ -37,21 +39,20 @@
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      gap: 10px;
+      gap: 12px;
       z-index: 10;
     }
-    button {
-      padding: 10px 15px;
-      font-size: 16px;
-      border-radius: 5px;
+    #buttons button {
+      padding: 12px;
+      font-size: 20px;
+      border-radius: 8px;
       border: none;
-      background-color: rgba(0,0,0,0.5);
+      background-color: rgba(0,0,0,0.6);
       color: white;
       cursor: pointer;
-      touch-action: manipulation; /* важно для мобильных */
     }
-    button:hover {
-      background-color: rgba(0,0,0,0.8);
+    #buttons button:hover {
+      background-color: rgba(0,0,0,0.9);
     }
   </style>
 </head>
@@ -60,13 +61,16 @@
 <div id="ui">Наведи камеру на маркер</div>
 
 <div id="buttons">
-  <button onclick="rotateModel('up')">Вверх</button>
-  <button onclick="rotateModel('down')">Вниз</button>
-  <button onclick="rotateModel('left')">Влево</button>
-  <button onclick="rotateModel('right')">Вправо</button>
+  <button onclick="rotateModel('up')">⬆️</button>
+  <button onclick="rotateModel('down')">⬇️</button>
+  <button onclick="rotateModel('left')">⬅️</button>
+  <button onclick="rotateModel('right')">➡️</button>
+  <button onclick="scaleModel('up')">🔼</button>
+  <button onclick="scaleModel('down')">🔽</button>
+  <button onclick="resetModel()">⭯</button>
 </div>
 
-<a-scene mindar-image="imageTargetSrc: ./targets/targets.mind;" 
+<a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; autoStart: true; uiLoading: Загрузка...; uiScanning: Наведите камеру на маркер;" 
          color-space="sRGB" 
          renderer="logarithmicDepthBuffer: true; antialias: true;" 
          vr-mode-ui="enabled: false"
@@ -79,73 +83,70 @@
   <a-entity mindar-image-target="targetIndex: 0">
 
     <!-- Обертка модели -->
-    <a-entity id="modelWrapper" position="0 0 0" rotation="90 0 0">
+    <a-entity id="modelWrapper" position="0 0 0" rotation="0 0 0" scale="0.05 0.05 0.05">
 
       <!-- 3D модель -->
       <a-gltf-model id="model"
                     src="./assets/model.glb" 
-                    scale="1 1 1" 
-                    position="0 0 0">
+                    position="0 0 0"
+                    rotation="0 0 0"
+                    scale="1 1 1">
       </a-gltf-model>
+
+      <!-- Свет -->
+      <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
+      <a-light type="directional" position="0 1 0" intensity="0.8"></a-light>
 
     </a-entity>
 
-    <!-- Свет -->
-    <a-light type="ambient" color="#ffffff" intensity="0.5"></a-light>
-    <a-light type="directional" position="0 1 0" intensity="0.8"></a-light>
-
   </a-entity>
 
-  <script>
-    const wrapper = document.querySelector('#modelWrapper');
-
-    // Поворот модели на 90° по кнопкам
-    function rotateModel(direction) {
-      const rotation = wrapper.getAttribute('rotation');
-
-      switch(direction) {
-        case 'up':
-          rotation.x -= 90;
-          break;
-        case 'down':
-          rotation.x += 90;
-          break;
-        case 'left':
-          rotation.y -= 90;
-          break;
-        case 'right':
-          rotation.y += 90;
-          break;
-      }
-
-      wrapper.setAttribute('rotation', rotation);
-    }
-
-    // Блокировка масштабирования на мобильных (кнопки не трогаем)
-    let lastTouchEnd = 0;
-
-    document.addEventListener('touchstart', function (event) {
-      if (event.touches.length > 1) {
-        event.preventDefault(); // запрет pinch-to-zoom
-      }
-    }, { passive: false });
-
-    document.addEventListener('touchend', function (event) {
-      // если событие произошло на кнопке, не блокируем
-      if (event.target.closest('button')) return;
-
-      const now = (new Date()).getTime();
-      if (now - lastTouchEnd <= 300) {
-        event.preventDefault(); // запрет двойного тапа
-      }
-      lastTouchEnd = now;
-    }, { passive: false });
-
-    document.addEventListener('gesturestart', function (event) {
-      event.preventDefault(); // блокировка жестов на iOS
-    });
-  </script>
 </a-scene>
+
+<script>
+  const wrapper = document.querySelector('#modelWrapper');
+
+  // Вращение модели стрелками
+  function rotateModel(direction) {
+    const rotation = wrapper.getAttribute('rotation');
+    switch(direction) {
+      case 'up': rotation.x -= 15; break;
+      case 'down': rotation.x += 15; break;
+      case 'left': rotation.y -= 15; break;
+      case 'right': rotation.y += 15; break;
+    }
+    wrapper.setAttribute('rotation', rotation);
+  }
+
+  // Изменение масштаба
+  function scaleModel(direction) {
+    const scale = wrapper.getAttribute('scale');
+    let factor = direction === 'up' ? 1.1 : 0.9;
+    wrapper.setAttribute('scale', {
+      x: scale.x * factor,
+      y: scale.y * factor,
+      z: scale.z * factor
+    });
+  }
+
+  // Сброс позиции, вращения и масштаба
+  function resetModel() {
+    wrapper.setAttribute('position','0 0 0');
+    wrapper.setAttribute('rotation','0 0 0');
+    wrapper.setAttribute('scale','0.05 0.05 0.05');
+  }
+
+  // Блокировка масштабирования/двойного тапа на мобильных
+  let lastTouchEnd = 0;
+  document.addEventListener('touchstart', e => { if(e.touches.length > 1) e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchend', e => {
+    if(e.target.closest('button')) return;
+    const now = (new Date()).getTime();
+    if(now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, {passive:false});
+  document.addEventListener('gesturestart', e => e.preventDefault());
+</script>
 
 </body>
 </html>
