@@ -8,347 +8,149 @@
   <!-- A-Frame -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.7.1/aframe.min.js"></script>
 
-  <!-- MindAR A-Frame component -->
+  <!-- MindAR A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: #000;
-      color: #fff;
-      font-family: Arial, sans-serif;
-    }
-    #overlay {
-      position: fixed;
-      left: 0; right: 0; top: 0;
-      padding: 12px 10px;
-      text-align: center;
-      z-index: 20;
-      pointer-events: none;
-      background: linear-gradient(180deg, rgba(0,0,0,0.45), transparent);
-      font-size: 16px;
-    }
-    #ui {
-      position: fixed;
-      left: 10px;
-      bottom: 10px;
-      z-index: 21;
-      display: flex;
-      gap: 10px;
-    }
-    button {
-      pointer-events: auto;
-      padding: 10px 14px;
-      background: #222;
-      color: #fff;
-      border: 1px solid #444;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:active { transform: translateY(1px); }
-    #log {
-      position: fixed;
-      right: 10px;
-      bottom: 10px;
-      z-index: 21;
-      max-width: 320px;
-      font-size: 13px;
-      color: #ddd;
-    }
-    a-scene { width:100%; height:100%; display:block; }
+    html, body { height:100%; margin:0; background:#000; color:#fff; font-family:Arial, sans-serif;}
+    #overlay {position:fixed; left:0; right:0; top:0; padding:10px; text-align:center; z-index:20;
+      background: linear-gradient(0deg, rgba(0,0,0,0.5), transparent);}
+    #ui {position:fixed; left:10px; bottom:10px; z-index:21; display:flex; gap:10px;}
+    button {padding:10px 14px; background:#222; color:#fff; border:1px solid #444; border-radius:6px; cursor:pointer;}
+    #log {position:fixed; right:10px; bottom:10px; font-size:12px; color:#ccc; max-width:300px;}
   </style>
 </head>
 <body>
-  <div id="overlay">Нажмите «Запустить AR», чтобы разрешить камеру</div>
 
-  <div id="ui">
-    <button id="btn-start" type="button">Запустить AR</button>
-    <button id="btn-reset"  type="button">Сброс</button>
-    <button id="btn-stop"   type="button">Остановить AR</button>
-  </div>
+<div id="overlay">Нажмите «Запустить AR» чтобы разрешить камеру</div>
+<div id="ui">
+  <button id="btn-start">Запустить AR</button>
+  <button id="btn-reset">Сброс</button>
+</div>
+<div id="log"></div>
 
-  <div id="log"></div>
+<a-scene mindar-image="imageTargetSrc: targets/targets.mind; autoStart: false; uiLoading: Загрузка...; uiScanning: Наведите камеру на маркер;"
+         embedded
+         color-space="sRGB"
+         renderer="antialias: true; physicallyCorrectLights: true"
+         vr-mode-ui="enabled: false"
+         device-orientation-permission-ui="enabled: true">
 
-  <!-- A-Frame + MindAR сцена -->
-  <!-- autoStart: false — мы запускаем вручную -->
-  <a-scene
-    mindar-image="imageTargetSrc: targets/targets.mind; autoStart: false; uiLoading: Загрузка...; uiScanning: Наведите камеру на маркер;"
-    embedded
-    color-space="sRGB"
-    renderer="antialias: true; physicallyCorrectLights: true"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: true">
-
-    <!-- Маркер 0 -->
-    <a-entity mindar-image-target="targetIndex: 0">
-
-      <a-entity id="modelRoot" position="0 0 0" rotation="0 0 0" scale="0.05 0.05 0.05">
-        <!-- Свет -->
-        <a-entity light="type: directional; intensity: 1" position="0 1 1"></a-entity>
-
-        <!-- Модель: замени src при необходимости -->
-        <a-gltf-model id="theModel"
-                      src="assets/model.glb"
-                      position="0 0 0"
-                      rotation="0 0 0"
-                      scale="1 1 1"
-                      visible="true">
-        </a-gltf-model>
-      </a-entity>
-
+  <a-entity mindar-image-target="targetIndex: 0">
+    <a-entity id="modelRoot" position="0 0 0" rotation="0 0 0" scale="0.05 0.05 0.05">
+      <a-entity light="type: directional; intensity: 1" position="0 1 1"></a-entity>
+      <a-gltf-model id="theModel" src="assets/model.glb" position="0 0 0" rotation="0 0 0" scale="1 1 1"></a-gltf-model>
     </a-entity>
+  </a-entity>
 
-    <a-entity camera></a-entity>
-  </a-scene>
+  <a-entity camera></a-entity>
+</a-scene>
 
-  <script>
+<script>
+(function(){
+  const btnStart = document.getElementById('btn-start');
+  const btnReset = document.getElementById('btn-reset');
+  const overlay = document.getElementById('overlay');
+  const logEl = document.getElementById('log');
+  const sceneEl = document.querySelector('a-scene');
+  let mindarComp = null;
+  let mindarStarted = false;
+
+  function log(msg, isError=false){
+    console[isError ? 'error' : 'log'](msg);
+    const el = document.createElement('div');
+    el.textContent = msg;
+    el.style.color = isError ? '#ff8080' : '#ccc';
+    logEl.prepend(el);
+    while(logEl.children.length>10) logEl.removeChild(logEl.lastChild);
+  }
+
+  // Проверяем компонент после загрузки сцены
+  sceneEl.addEventListener('loaded', () => {
+    mindarComp = sceneEl.components['mindar-image'];
+    if(!mindarComp) {
+      log('MindAR компонент недоступен — проверьте targets.mind и скрипт', true);
+      overlay.textContent = 'Ошибка: MindAR компонент не найден';
+    } else {
+      log('MindAR компонент готов');
+    }
+  });
+
+  async function startMindAR(){
+    if(!mindarComp) return;
+    if(mindarStarted) return;
+    try {
+      overlay.textContent = 'Запрашивается камера...';
+      await mindarComp.start();
+      mindarStarted = true;
+      overlay.textContent = 'AR включён — наведите камеру на маркер';
+      log('MindAR стартовал');
+    } catch(e){
+      log('Ошибка старта MindAR: '+e.message, true);
+      overlay.textContent = 'Не удалось запустить AR — проверьте HTTPS и разрешения';
+    }
+  }
+
+  btnStart.addEventListener('click', startMindAR);
+
+  btnReset.addEventListener('click', ()=>{
+    const root = document.getElementById('modelRoot');
+    root.setAttribute('position','0 0 0');
+    root.setAttribute('rotation','0 0 0');
+    root.setAttribute('scale','0.05 0.05 0.05');
+    overlay.textContent = 'Позиция модели сброшена';
+  });
+
+  /* Жесты: drag, pinch, rotate */
   (function(){
-    const btnStart = document.getElementById('btn-start');
-    const btnReset = document.getElementById('btn-reset');
-    const btnStop  = document.getElementById('btn-stop');
-    const overlay  = document.getElementById('overlay');
-    const logEl    = document.getElementById('log');
+    const root = document.getElementById('modelRoot');
+    let lastTouch=null, lastDist=null, dragging=false;
 
-    function log(msg, isError=false){
-      console[isError ? 'error' : 'log'](msg);
-      const el = document.createElement('div');
-      el.textContent = msg;
-      el.style.color = isError ? '#ff8080' : '#ccc';
-      logEl.prepend(el);
-      // keep only few lines
-      while(logEl.children.length > 10) logEl.removeChild(logEl.lastChild);
+    function dist(t1,t2){ return Math.hypot(t1.clientX-t2.clientX, t1.clientY-t2.clientY); }
+
+    function onStart(e){
+      if(e.touches.length===1){ dragging=true; lastTouch={x:e.touches[0].clientX,y:e.touches[0].clientY}; }
+      if(e.touches.length===2){
+        lastDist = dist(e.touches[0],e.touches[1]);
+        lastTouch = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
+      }
     }
 
-    // Проверка безопасности (HTTPS или localhost)
-    const isSecure = (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
-    if(!isSecure){
-      overlay.textContent = 'Внимание: камера работает только по HTTPS или на localhost. GitHub Pages — HTTPS, но проверь URL.';
-      log('Страница не по HTTPS — камера может быть недоступна.', true);
-    }
-
-    // Сцена и переменные mindar
-    const sceneEl = document.querySelector('a-scene');
-    let mindarComp = null;
-    let mindarStarted = false;
-
-    // Ждём полной загрузки сцены и компонента
-    window.addEventListener('load', () => {
-      sceneEl.addEventListener('loaded', () => {
-        log('A-Frame сцена загружена');
-        // компонент может быть в sceneEl.components['mindar-image']
-        mindarComp = sceneEl.components && sceneEl.components['mindar-image'];
-        if(mindarComp){
-          log('MindAR компонент найден');
-        } else {
-          log('MindAR компонент ещё не инициализирован — ожидаем 500ms и пробуем снова');
-          setTimeout(() => {
-            mindarComp = sceneEl.components && sceneEl.components['mindar-image'];
-            if(mindarComp) log('MindAR компонент найден после задержки');
-            else log('MindAR компонент всё ещё не найден — проверьте подключение mindar-image.', true);
-          }, 500);
+    function onMove(e){
+      if(!root) return;
+      if(e.touches.length===1 && dragging && lastTouch){
+        const dx = e.touches[0].clientX - lastTouch.x;
+        const dy = e.touches[0].clientY - lastTouch.y;
+        const pos = root.getAttribute('position');
+        const factor = 0.0008;
+        root.setAttribute('position',{x:pos.x+dx*factor, y:pos.y-dy*factor, z:pos.z});
+        lastTouch={x:e.touches[0].clientX,y:e.touches[0].clientY};
+      }
+      if(e.touches.length===2){
+        const newDist = dist(e.touches[0],e.touches[1]);
+        if(lastDist){
+          const s = root.getAttribute('scale').x*(newDist/lastDist);
+          root.setAttribute('scale',{x:s,y:s,z:s});
         }
-      });
-    });
-
-    // Функция: безопасный запуск камеры (пробует getUserMedia как fallback)
-    async function ensureCameraPermission(){
-      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-        throw new Error('API getUserMedia не поддерживается в этом браузере');
+        const midX = (e.touches[0].clientX+e.touches[1].clientX)/2;
+        const rot = root.getAttribute('rotation');
+        const dx = midX - lastTouch.x;
+        root.setAttribute('rotation',{x:rot.x,y:rot.y+dx*0.3,z:rot.z});
+        lastDist=newDist;
+        lastTouch={x:midX,y:lastTouch.y};
       }
-      try {
-        log('Запрашиваем доступ к камере через getUserMedia (fallback) ...');
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        // сразу останавливаем поток — он нужен только чтобы показать диалог разрешения
-        stream.getTracks().forEach(t => t.stop());
-        log('Доступ к камере получен (или пользователь одобрил запрос).');
-        return true;
-      } catch (err) {
-        log('Доступ к камере не получен: ' + (err && err.message ? err.message : err), true);
-        throw err;
-      }
-    }
-
-    // Основная функция запуска MindAR
-    async function startMindAR(){
-      if(mindarStarted){
-        log('MindAR уже запущен');
-        return;
-      }
-      // Найдём компонент прямо перед запуском (на всякий)
-      mindarComp = sceneEl.components && sceneEl.components['mindar-image'];
-      if(!mindarComp){
-        log('MindAR компонент не найден. Ждём 300ms и пробуем снова...', true);
-        await new Promise(r => setTimeout(r, 300));
-        mindarComp = sceneEl.components && sceneEl.components['mindar-image'];
-      }
-      if(!mindarComp){
-        log('MindAR компонент недоступен. Проверьте, подключён ли скрипт mind-ar и атрибут imageTargetSrc.', true);
-        overlay.textContent = 'Ошибка: компонент MindAR не найден.';
-        return;
-      }
-
-      try {
-        overlay.textContent = 'Запрашивается доступ к камере...';
-        log('Попытка запустить mindar.start() (официальный метод)');
-        // Попытка напрямую запустить (обычно вызывает диалог камеры)
-        await mindarComp.start();
-        mindarStarted = true;
-        overlay.textContent = 'AR включён — наведите камеру на маркер';
-        log('mindar.start() успешно выполнился');
-        return;
-      } catch (errStart) {
-        // Если прямой start не сработал — попробуем сначала получить разрешение вручную, затем start
-        console.warn('mindar.start() вернул ошибку, пробуем getUserMedia -> start. Ошибка:', errStart);
-        try {
-          await ensureCameraPermission();
-          overlay.textContent = 'Повторный запуск AR...';
-          await mindarComp.start();
-          mindarStarted = true;
-          overlay.textContent = 'AR включён — наведите камеру на маркер';
-          log('mindar.start() успешно выполнился после получения разрешения вручную');
-          return;
-        } catch (err2) {
-          log('Не удалось запустить MindAR: ' + (err2 && err2.message ? err2.message : err2), true);
-          overlay.textContent = 'Ошибка запуска камеры — проверьте разрешения и HTTPS';
-          return;
-        }
-      }
-    }
-
-    // Остановка MindAR
-    async function stopMindAR(){
-      if(!mindarComp || !mindarStarted){
-        log('MindAR не запущен');
-        return;
-      }
-      try {
-        await mindarComp.stop();
-        mindarStarted = false;
-        overlay.textContent = 'AR остановлен';
-        log('MindAR остановлен');
-      } catch (err) {
-        log('Ошибка при остановке MindAR: ' + err.message, true);
-      }
-    }
-
-    // Кнопка "Запустить AR" — надёжно вызывает старт
-    btnStart.addEventListener('click', async (e) => {
       e.preventDefault();
-      // минимальная проверка на HTTPS
-      if(!isSecure){
-        alert('Камера работает только по HTTPS или на localhost. Проверьте URL (GitHub Pages использует HTTPS).');
-        log('Попытка запустить без HTTPS', true);
-        return;
-      }
+    }
 
-      overlay.textContent = 'Подготовка AR...';
-      try {
-        await startMindAR();
-      } catch (err) {
-        log('Ошибка старта AR: ' + (err && err.message ? err.message : err), true);
-        overlay.textContent = 'Не удалось запустить AR — смотрите логи';
-      }
-    });
+    function onEnd(e){ if(e.touches.length===0){dragging=false; lastTouch=null; lastDist=null;} }
 
-    // Кнопка "Сброс"
-    btnReset.addEventListener('click', (e) => {
-      e.preventDefault();
-      const root = document.getElementById('modelRoot');
-      if(!root){ log('modelRoot не найден', true); return; }
-      root.setAttribute('position', '0 0 0');
-      root.setAttribute('rotation', '0 0 0');
-      root.setAttribute('scale', '0.05 0.05 0.05');
-      overlay.textContent = 'Позиция модели сброшена';
-      log('Сброс трансформаций модели');
-    });
-
-    // Кнопка "Остановить AR"
-    btnStop.addEventListener('click', async (e) => {
-      e.preventDefault();
-      await stopMindAR();
-    });
-
-    /* ================
-       ЖЕСТЫ: drag / pinch / rotate
-       ================ */
-    (function(){
-      const root = document.getElementById('modelRoot');
-      if(!root) { log('modelRoot не найден для жестов', true); return; }
-
-      let lastTouch = null;
-      let lastDist  = null;
-      let dragging  = false;
-
-      function dist(t1, t2){
-        const dx = t1.clientX - t2.clientX;
-        const dy = t1.clientY - t2.clientY;
-        return Math.sqrt(dx*dx + dy*dy);
-      }
-
-      function onStart(e){
-        if(e.touches.length === 1){
-          dragging = true;
-          lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        } else if(e.touches.length === 2){
-          lastDist = dist(e.touches[0], e.touches[1]);
-          lastTouch = {
-            x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-            y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-          };
-        }
-      }
-
-      function onMove(e){
-        if(!root) return;
-
-        if(e.touches.length === 1 && dragging && lastTouch){
-          const dx = e.touches[0].clientX - lastTouch.x;
-          const dy = e.touches[0].clientY - lastTouch.y;
-          const pos = root.getAttribute('position');
-          const factor = 0.0008;
-          root.setAttribute('position', {
-            x: pos.x + dx * factor,
-            y: pos.y - dy * factor,
-            z: pos.z
-          });
-          lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        }
-
-        if(e.touches.length === 2){
-          const newDist = dist(e.touches[0], e.touches[1]);
-          if(lastDist){
-            const scaleFactor = newDist / lastDist;
-            const s = root.getAttribute('scale').x * scaleFactor;
-            root.setAttribute('scale', { x: s, y: s, z: s });
-          }
-          const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-          const rot  = root.getAttribute('rotation');
-          const dx   = midX - lastTouch.x;
-          root.setAttribute('rotation', { x: rot.x, y: rot.y + dx * 0.3, z: rot.z });
-          lastDist = newDist;
-          lastTouch = { x: midX, y: lastTouch.y };
-        }
-
-        e.preventDefault();
-      }
-
-      function onEnd(e){
-        if(e.touches.length === 0){
-          dragging = false;
-          lastTouch = null;
-          lastDist = null;
-        }
-      }
-
-      sceneEl.addEventListener('touchstart', onStart, { passive: false });
-      sceneEl.addEventListener('touchmove',  onMove,  { passive: false });
-      sceneEl.addEventListener('touchend',   onEnd,   { passive: false });
-
-    })();
-
+    sceneEl.addEventListener('touchstart',onStart,{passive:false});
+    sceneEl.addEventListener('touchmove',onMove,{passive:false});
+    sceneEl.addEventListener('touchend',onEnd,{passive:false});
   })();
-  </script>
+
+})();
+</script>
+
 </body>
 </html>
