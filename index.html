@@ -39,7 +39,7 @@
 
 <body>
   <!-- Текстовая подсказка сверху -->
-  <div id="overlay">Наведите камеру на маркер. Нажмите «Запустить AR».</div>
+  <div id="overlay">Нажмите «Запустить AR» чтобы разрешить камеру</div>
 
   <!-- Кнопки управления -->
   <div id="ui">
@@ -49,14 +49,12 @@
 
   <!-- A-Frame + MindAR сцена -->
   <a-scene
-      mindar-image="imageTargetSrc: targets/targets.mind;
-                    uiLoading: Загрузка...;
-                    uiScanning: Наведите камеру на маркер;"
+      mindar-image="imageTargetSrc: targets/targets.mind"
       embedded
       color-space="sRGB"
-      renderer="antialias: true; physicallyCorrectLights: true;"
+      renderer="antialias: true; physicallyCorrectLights: true"
       vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false">
+      device-orientation-permission-ui="enabled: true">
 
     <!-- Цель (маркер) -->
     <a-entity mindar-image-target="targetIndex: 0">
@@ -93,26 +91,34 @@
 
     let mindarComponent;
 
-    document.addEventListener('DOMContentLoaded', () => {
-      const scene = document.querySelector('a-scene');
-      mindarComponent = scene.components['mindar-image'];
+    /* ---------------------------
+       ИНИЦИАЛИЗАЦИЯ MINDAR
+       --------------------------- */
+    window.addEventListener("load", () => {
+      const scene = document.querySelector("a-scene");
 
-      // Кнопка "Запустить AR"
-      btnStart.addEventListener('click', async () => {
-        try {
-          await mindarComponent.start();
-          overlay.textContent = "Наведите камеру на маркер";
-        } catch (err) {
-          alert("Разрешите доступ к камере. Для телефона нужен HTTPS или localhost.");
-        }
-      });
+      scene.addEventListener("loaded", () => {
+        mindarComponent = scene.components["mindar-image"];
+        console.log("MindAR готов");
 
-      // Кнопка "Сброс"
-      btnReset.addEventListener('click', () => {
-        const root = document.getElementById('modelRoot');
-        root.setAttribute('position', '0 0 0');
-        root.setAttribute('rotation', '0 0 0');
-        root.setAttribute('scale', '0.05 0.05 0.05');
+        // КНОПКА: Запуск AR
+        btnStart.addEventListener('click', async () => {
+          try {
+            await mindarComponent.start();
+            overlay.textContent = "Наведите камеру на маркер";
+          } catch (err) {
+            console.error(err);
+            alert("Разрешите доступ к камере. На телефоне нужен HTTPS (GitHub Pages подходит).");
+          }
+        });
+
+        // КНОПКА: Сброс модели
+        btnReset.addEventListener('click', () => {
+          const root = document.getElementById('modelRoot');
+          root.setAttribute('position', '0 0 0');
+          root.setAttribute('rotation', '0 0 0');
+          root.setAttribute('scale', '0.05 0.05 0.05');
+        });
       });
     });
 
@@ -171,7 +177,7 @@
           const newDist = dist(e.touches[0], e.touches[1]);
 
           if (lastDist) {
-            // масштаб
+            // масштабирование
             const scaleFactor = newDist / lastDist;
             const s = root.getAttribute('scale').x * scaleFactor;
 
