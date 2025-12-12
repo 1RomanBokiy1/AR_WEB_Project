@@ -1,35 +1,40 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
-  <title>AR A-Frame + MindAR — Практическая работа №7</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+  <title>AR с кнопками управления</title>
 
   <!-- A-Frame -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.7.1/aframe.min.js"></script>
 
-  <!-- MindAR A-Frame -->
+  <!-- MindAR -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    html, body { height:100%; margin:0; background:#000; color:#fff; font-family:Arial, sans-serif;}
+    html, body { height:100%; margin:0; background:#000; color:#fff; font-family:Arial,sans-serif;}
     #overlay {position:fixed; left:0; right:0; top:0; padding:10px; text-align:center; z-index:20;
       background: linear-gradient(0deg, rgba(0,0,0,0.5), transparent);}
-    #ui {position:fixed; left:10px; bottom:10px; z-index:21; display:flex; gap:10px;}
-    button {padding:10px 14px; background:#222; color:#fff; border:1px solid #444; border-radius:6px; cursor:pointer;}
-    #log {position:fixed; right:10px; bottom:10px; font-size:12px; color:#ccc; max-width:300px;}
+    #ui {position:fixed; left:10px; bottom:10px; z-index:21; display:flex; flex-wrap:wrap; gap:6px;}
+    button {padding:10px 12px; background:#222; color:#fff; border:1px solid #444; border-radius:6px; cursor:pointer;}
+    button:active {transform: translateY(1px);}
   </style>
 </head>
 <body>
 
-<div id="overlay">Нажмите «Запустить AR» чтобы разрешить камеру</div>
+<div id="overlay">Загрузка AR...</div>
+
 <div id="ui">
-  <button id="btn-start">Запустить AR</button>
+  <button id="btn-up">↑ Вверх</button>
+  <button id="btn-down">↓ Вниз</button>
+  <button id="btn-left">← Влево</button>
+  <button id="btn-right">→ Вправо</button>
+  <button id="btn-rotate-left">⟲ Вращать влево</button>
+  <button id="btn-rotate-right">⟳ Вращать вправо</button>
   <button id="btn-reset">Сброс</button>
 </div>
-<div id="log"></div>
 
-<a-scene mindar-image="imageTargetSrc: targets/targets.mind; autoStart: false; uiLoading: Загрузка...; uiScanning: Наведите камеру на маркер;"
+<a-scene mindar-image="imageTargetSrc: targets/targets.mind; autoStart: true; uiLoading: Загрузка...; uiScanning: Наведите камеру на маркер;"
          embedded
          color-space="sRGB"
          renderer="antialias: true; physicallyCorrectLights: true"
@@ -38,7 +43,7 @@
 
   <a-entity mindar-image-target="targetIndex: 0">
     <a-entity id="modelRoot" position="0 0 0" rotation="0 0 0" scale="0.05 0.05 0.05">
-      <a-entity light="type: directional; intensity: 1" position="0 1 1"></a-entity>
+      <a-entity light="type: directional; intensity:1" position="0 1 1"></a-entity>
       <a-gltf-model id="theModel" src="assets/model.glb" position="0 0 0" rotation="0 0 0" scale="1 1 1"></a-gltf-model>
     </a-entity>
   </a-entity>
@@ -47,109 +52,51 @@
 </a-scene>
 
 <script>
-(function(){
-  const btnStart = document.getElementById('btn-start');
-  const btnReset = document.getElementById('btn-reset');
+window.addEventListener('load', ()=>{
+
   const overlay = document.getElementById('overlay');
-  const logEl = document.getElementById('log');
-  const sceneEl = document.querySelector('a-scene');
-  let mindarComp = null;
-  let mindarStarted = false;
+  const root = document.getElementById('modelRoot');
 
-  function log(msg, isError=false){
-    console[isError ? 'error' : 'log'](msg);
-    const el = document.createElement('div');
-    el.textContent = msg;
-    el.style.color = isError ? '#ff8080' : '#ccc';
-    logEl.prepend(el);
-    while(logEl.children.length>10) logEl.removeChild(logEl.lastChild);
-  }
+  overlay.textContent = 'AR включен — наведите камеру на маркер';
 
-  // Проверяем компонент после загрузки сцены
-  sceneEl.addEventListener('loaded', () => {
-    mindarComp = sceneEl.components['mindar-image'];
-    if(!mindarComp) {
-      log('MindAR компонент недоступен — проверьте targets.mind и скрипт', true);
-      overlay.textContent = 'Ошибка: MindAR компонент не найден';
-    } else {
-      log('MindAR компонент готов');
-    }
+  // Кнопки управления моделью
+  document.getElementById('btn-up').addEventListener('click',()=> {
+    const pos = root.getAttribute('position');
+    root.setAttribute('position',{x:pos.x, y:pos.y+0.02, z:pos.z});
   });
 
-  async function startMindAR(){
-    if(!mindarComp) return;
-    if(mindarStarted) return;
-    try {
-      overlay.textContent = 'Запрашивается камера...';
-      await mindarComp.start();
-      mindarStarted = true;
-      overlay.textContent = 'AR включён — наведите камеру на маркер';
-      log('MindAR стартовал');
-    } catch(e){
-      log('Ошибка старта MindAR: '+e.message, true);
-      overlay.textContent = 'Не удалось запустить AR — проверьте HTTPS и разрешения';
-    }
-  }
+  document.getElementById('btn-down').addEventListener('click',()=> {
+    const pos = root.getAttribute('position');
+    root.setAttribute('position',{x:pos.x, y:pos.y-0.02, z:pos.z});
+  });
 
-  btnStart.addEventListener('click', startMindAR);
+  document.getElementById('btn-left').addEventListener('click',()=> {
+    const pos = root.getAttribute('position');
+    root.setAttribute('position',{x:pos.x-0.02, y:pos.y, z:pos.z});
+  });
 
-  btnReset.addEventListener('click', ()=>{
-    const root = document.getElementById('modelRoot');
+  document.getElementById('btn-right').addEventListener('click',()=> {
+    const pos = root.getAttribute('position');
+    root.setAttribute('position',{x:pos.x+0.02, y:pos.y, z:pos.z});
+  });
+
+  document.getElementById('btn-rotate-left').addEventListener('click',()=> {
+    const rot = root.getAttribute('rotation');
+    root.setAttribute('rotation',{x:rot.x, y:rot.y-5, z:rot.z});
+  });
+
+  document.getElementById('btn-rotate-right').addEventListener('click',()=> {
+    const rot = root.getAttribute('rotation');
+    root.setAttribute('rotation',{x:rot.x, y:rot.y+5, z:rot.z});
+  });
+
+  document.getElementById('btn-reset').addEventListener('click',()=>{
     root.setAttribute('position','0 0 0');
     root.setAttribute('rotation','0 0 0');
     root.setAttribute('scale','0.05 0.05 0.05');
-    overlay.textContent = 'Позиция модели сброшена';
   });
 
-  /* Жесты: drag, pinch, rotate */
-  (function(){
-    const root = document.getElementById('modelRoot');
-    let lastTouch=null, lastDist=null, dragging=false;
-
-    function dist(t1,t2){ return Math.hypot(t1.clientX-t2.clientX, t1.clientY-t2.clientY); }
-
-    function onStart(e){
-      if(e.touches.length===1){ dragging=true; lastTouch={x:e.touches[0].clientX,y:e.touches[0].clientY}; }
-      if(e.touches.length===2){
-        lastDist = dist(e.touches[0],e.touches[1]);
-        lastTouch = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
-      }
-    }
-
-    function onMove(e){
-      if(!root) return;
-      if(e.touches.length===1 && dragging && lastTouch){
-        const dx = e.touches[0].clientX - lastTouch.x;
-        const dy = e.touches[0].clientY - lastTouch.y;
-        const pos = root.getAttribute('position');
-        const factor = 0.0008;
-        root.setAttribute('position',{x:pos.x+dx*factor, y:pos.y-dy*factor, z:pos.z});
-        lastTouch={x:e.touches[0].clientX,y:e.touches[0].clientY};
-      }
-      if(e.touches.length===2){
-        const newDist = dist(e.touches[0],e.touches[1]);
-        if(lastDist){
-          const s = root.getAttribute('scale').x*(newDist/lastDist);
-          root.setAttribute('scale',{x:s,y:s,z:s});
-        }
-        const midX = (e.touches[0].clientX+e.touches[1].clientX)/2;
-        const rot = root.getAttribute('rotation');
-        const dx = midX - lastTouch.x;
-        root.setAttribute('rotation',{x:rot.x,y:rot.y+dx*0.3,z:rot.z});
-        lastDist=newDist;
-        lastTouch={x:midX,y:lastTouch.y};
-      }
-      e.preventDefault();
-    }
-
-    function onEnd(e){ if(e.touches.length===0){dragging=false; lastTouch=null; lastDist=null;} }
-
-    sceneEl.addEventListener('touchstart',onStart,{passive:false});
-    sceneEl.addEventListener('touchmove',onMove,{passive:false});
-    sceneEl.addEventListener('touchend',onEnd,{passive:false});
-  })();
-
-})();
+});
 </script>
 
 </body>
