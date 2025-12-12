@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
   <title>AR A-Frame + MindAR — Практическая работа</title>
 
-  <!-- A-Frame (CDN) -->
+  <!-- A-Frame -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.7.1/aframe.min.js"></script>
 
   <!-- MindAR A-Frame component -->
@@ -33,33 +33,34 @@
       border:1px solid #444;
       border-radius:6px;
       font-size:16px;
+      cursor:pointer;
     }
   </style>
 </head>
 
 <body>
-  <!-- Текстовая подсказка сверху -->
+  <!-- Текст -->
   <div id="overlay">Нажмите «Запустить AR» чтобы разрешить камеру</div>
 
-  <!-- Кнопки управления -->
+  <!-- Кнопки -->
   <div id="ui">
     <button id="btn-start">Запустить AR</button>
     <button id="btn-reset">Сброс</button>
   </div>
 
-  <!-- A-Frame + MindAR сцена -->
+  <!-- Сцена -->
   <a-scene
-      mindar-image="imageTargetSrc: targets/targets.mind"
+      mindar-image="imageTargetSrc: targets/targets.mind; autoStart: false"
       embedded
       color-space="sRGB"
       renderer="antialias: true; physicallyCorrectLights: true"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: true">
 
-    <!-- Цель (маркер) -->
+    <!-- Маркер -->
     <a-entity mindar-image-target="targetIndex: 0">
 
-      <!-- Контейнер модели -->
+      <!-- Контейнер -->
       <a-entity id="modelRoot"
                 position="0 0 0"
                 rotation="0 0 0"
@@ -83,50 +84,29 @@
     <a-entity camera></a-entity>
   </a-scene>
 
-  <!-- Логика кнопок + жесты -->
+  <!-- Логика -->
   <script>
-    const btnStart = document.getElementById('btn-start');
-    const btnReset = document.getElementById('btn-reset');
-    const overlay  = document.getElementById('overlay');
-
-    let mindarComponent;
-
-    /* ---------------------------
-       ИНИЦИАЛИЗАЦИЯ MINDAR
-       --------------------------- */
     window.addEventListener("load", () => {
+
       const scene = document.querySelector("a-scene");
+      const btnStart = document.getElementById("btn-start");
+      const btnReset = document.getElementById("btn-reset");
+      const overlay = document.getElementById("overlay");
 
-      scene.addEventListener("loaded", () => {
-        mindarComponent = scene.components["mindar-image"];
-        console.log("MindAR готов");
-
-        // КНОПКА: Запуск AR
-        btnStart.addEventListener('click', async () => {
-          try {
-            await mindarComponent.start();
-            overlay.textContent = "Наведите камеру на маркер";
-          } catch (err) {
-            console.error(err);
-            alert("Разрешите доступ к камере. На телефоне нужен HTTPS (GitHub Pages подходит).");
-          }
-        });
-
-        // КНОПКА: Сброс модели
-        btnReset.addEventListener('click', () => {
-          const root = document.getElementById('modelRoot');
-          root.setAttribute('position', '0 0 0');
-          root.setAttribute('rotation', '0 0 0');
-          root.setAttribute('scale', '0.05 0.05 0.05');
-        });
+      // Запуск MindAR через событие (правильный способ)
+      btnStart.addEventListener("click", () => {
+        scene.emit("startAR");
+        overlay.textContent = "Наведите камеру на маркер";
       });
-    });
 
-    /* ============================
-       ЖЕСТЫ: перемещение, масштаб, вращение
-       ============================ */
+      btnReset.addEventListener("click", () => {
+        const root = document.getElementById('modelRoot');
+        root.setAttribute('position', '0 0 0');
+        root.setAttribute('rotation', '0 0 0');
+        root.setAttribute('scale',  '0.05 0.05 0.05');
+      });
 
-    (function() {
+      /* Жесты */
       const root = document.getElementById('modelRoot');
       let lastTouch = null;
       let lastDist  = null;
@@ -155,7 +135,6 @@
       function onMove(e) {
         if (!root) return;
 
-        // один палец → перемещение
         if (e.touches.length === 1 && dragging && lastTouch) {
           const dx = e.touches[0].clientX - lastTouch.x;
           const dy = e.touches[0].clientY - lastTouch.y;
@@ -172,21 +151,16 @@
           lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
         }
 
-        // два пальца → масштаб + вращение
         if (e.touches.length === 2) {
           const newDist = dist(e.touches[0], e.touches[1]);
 
           if (lastDist) {
-            // масштабирование
             const scaleFactor = newDist / lastDist;
             const s = root.getAttribute('scale').x * scaleFactor;
 
-            root.setAttribute('scale', {
-              x: s, y: s, z: s
-            });
+            root.setAttribute('scale', {x: s, y: s, z: s});
           }
 
-          // вращение по оси Y
           const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
           const rot  = root.getAttribute('rotation');
           const dx   = midX - lastTouch.x;
@@ -216,7 +190,7 @@
       sceneEl.addEventListener('touchstart', onStart, {passive:false});
       sceneEl.addEventListener('touchmove',  onMove,  {passive:false});
       sceneEl.addEventListener('touchend',   onEnd,   {passive:false});
-    })();
+    });
   </script>
 </body>
 </html>
